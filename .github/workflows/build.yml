@@ -1,0 +1,49 @@
+name: Build PNT VPN APK
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+
+      - name: Generate Android Project Structure & Add V2Ray
+        run: |
+          # lib/main.dart ကို ခေတ္တသိမ်းထားပြီး Flutter Project အပြည့်အစုံ တည်ဆောက်ခြင်း
+          cp lib/main.dart /tmp/main.dart
+          flutter create --org com.pnt.vpn --project-name pnt_vpn .
+          cp /tmp/main.dart lib/main.dart
+          
+          # V2Ray နှင့် HTTP package များ ထည့်သွင်းခြင်း
+          flutter pub add flutter_v2ray http shared_preferences
+          
+          # Android တွင် VPN ချိတ်ဆက်ရန် လိုအပ်သော Settings များ ပြင်ဆင်ခြင်း
+          sed -i 's/minSdkVersion flutter.minSdkVersion/minSdkVersion 21/g' android/app/build.gradle || true
+          sed -i 's/minSdk = flutter.minSdkVersion/minSdk = 21/g' android/app/build.gradle || true
+          sed -i 's/<application/<application android:extractNativeLibs="true"/g' android/app/src/main/AndroidManifest.xml
+
+      - name: Build Release APK
+        run: flutter build apk --release
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: PNT-VPN-Release-APK
+          path: build/app/outputs/flutter-apk/app-release.apk
