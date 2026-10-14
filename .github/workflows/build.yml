@@ -22,25 +22,36 @@ jobs:
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
+          flutter-version: '3.24.3'
           channel: 'stable'
 
       - name: Generate Android Project Structure & Add V2Ray
         run: |
-          # lib/main.dart ကို ခေတ္တသိမ်းထားပြီး Flutter Project အပြည့်အစုံ တည်ဆောက်ခြင်း
           cp lib/main.dart /tmp/main.dart
-          flutter create --org com.pnt.vpn --project-name pnt_vpn .
+          rm -rf lib
+          flutter create --org com.pnt.vpn --project-name pnt_vpn --platforms android .
           cp /tmp/main.dart lib/main.dart
           
-          # V2Ray နှင့် HTTP package များ ထည့်သွင်းခြင်း
-          flutter pub add flutter_v2ray http shared_preferences
+          flutter pub add flutter_v2ray:^1.0.8 http shared_preferences
           
-          # Android တွင် VPN ချိတ်ဆက်ရန် လိုအပ်သော Settings များ ပြင်ဆင်ခြင်း
-          sed -i 's/minSdkVersion flutter.minSdkVersion/minSdkVersion 21/g' android/app/build.gradle || true
+          # minSdkVersion ကို 21 သို့ ပြောင်းခြင်း
           sed -i 's/minSdk = flutter.minSdkVersion/minSdk = 21/g' android/app/build.gradle || true
-          sed -i 's/<application/<application android:extractNativeLibs="true"/g' android/app/src/main/AndroidManifest.xml
+          sed -i 's/minSdkVersion flutter.minSdkVersion/minSdkVersion 21/g' android/app/build.gradle || true
+          
+          # Error တွင် ညွှန်ကြားထားသည့်အတိုင်း useLegacyPackaging ကို build.gradle ထဲသို့ ထည့်သွင်းခြင်း
+          cat << 'EOF' >> android/app/build.gradle
+          
+          android {
+              packagingOptions {
+                  jniLibs {
+                      useLegacyPackaging = true
+                  }
+              }
+          }
+          EOF
 
       - name: Build Release APK
-        run: flutter build apk --release
+        run: flutter build apk --release --no-tree-shake-icons
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
