@@ -1,4 +1,4 @@
-name: Build PNT VPN APK
+name: Build NovaX VPN APK
 
 on:
   push:
@@ -25,20 +25,49 @@ jobs:
           flutter-version: '3.24.3'
           channel: 'stable'
 
-      - name: Generate Android Project Structure & Add V2Ray
+      - name: Generate Project, Set NovaX Logo & Add V2Ray
         run: |
           cp lib/main.dart /tmp/main.dart
+          if [ -f logo.jpg ]; then cp logo.jpg /tmp/logo.jpg; fi
+          if [ -f logo.png ]; then cp logo.png /tmp/logo.jpg; fi
+          
           rm -rf lib
-          flutter create --org com.pnt.vpn --project-name pnt_vpn --platforms android .
+          flutter create --org com.novax.vpn --project-name novax_vpn --platforms android .
           cp /tmp/main.dart lib/main.dart
           
-          flutter pub add flutter_v2ray:^1.0.8 http shared_preferences
+          mkdir -p assets
+          if [ -f /tmp/logo.jpg ]; then
+            cp /tmp/logo.jpg assets/logo.jpg
+          fi
           
-          # minSdkVersion ကို 21 သို့ ပြောင်းခြင်း
+          # V2Ray, URL Launcher နှင့် App Icon ပြောင်းသည့် Package များ ထည့်သွင်းခြင်း
+          flutter pub add flutter_v2ray:^1.0.8 http shared_preferences url_launcher
+          flutter pub add --dev flutter_launcher_icons
+          
+          # pubspec.yaml ထဲသို့ Logo လမ်းကြောင်း ထည့်သွင်းခြင်း
+          cat << 'EOF' >> pubspec.yaml
+          
+          flutter_launcher_icons:
+            android: true
+            image_path: "assets/logo.jpg"
+            adaptive_icon_background: "#0A0A0C"
+            adaptive_icon_foreground: "assets/logo.jpg"
+          EOF
+          
+          sed -i 's/^flutter:/flutter:\n  assets:\n    - assets\//' pubspec.yaml
+          
+          # လိုဂိုပုံ ရှိပါက App Icon အဖြစ် အလိုအလျောက် ပြောင်းလဲခြင်း
+          if [ -f assets/logo.jpg ]; then
+            dart run flutter_launcher_icons
+          fi
+          
+          # App နာမည်ကို "NovaX VPN" သို့ ပြောင်းခြင်း
+          sed -i 's/android:label="novax_vpn"/android:label="NovaX VPN"/g' android/app/src/main/AndroidManifest.xml
+          
+          # SDK နှင့် Packaging ပြင်ဆင်ခြင်း
           sed -i 's/minSdk = flutter.minSdkVersion/minSdk = 21/g' android/app/build.gradle || true
           sed -i 's/minSdkVersion flutter.minSdkVersion/minSdkVersion 21/g' android/app/build.gradle || true
           
-          # Error တွင် ညွှန်ကြားထားသည့်အတိုင်း useLegacyPackaging ကို build.gradle ထဲသို့ ထည့်သွင်းခြင်း
           cat << 'EOF' >> android/app/build.gradle
           
           android {
@@ -56,5 +85,5 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: PNT-VPN-Release-APK
+          name: NovaX-VPN-Release-APK
           path: build/app/outputs/flutter-apk/app-release.apk
